@@ -1,5 +1,5 @@
-CREATE DATABASE SegundoParcial;
-USE SegundoParcial;
+CREATE DATABASE SegundoParcialFinal;
+USE SegundoParcialFinal;
 
 CREATE TABLE dimRol (
     idRol INT PRIMARY KEY,
@@ -23,38 +23,54 @@ CREATE TABLE dimTiempo (
 	dia INT
 );
 
-CREATE TABLE dimTripulacion (
-	idCrew INT PRIMARY KEY,
-	nombre VARCHAR(101)
-)
+
+CREATE TABLE dimDestino (
+    idDestino INT PRIMARY KEY,
+    pais VARCHAR(100),
+    ciudad VARCHAR(100),
+    aeropuerto VARCHAR(255)
+);
 
 CREATE TABLE factVuelo (
     idAerolinea INT,
     idTiempo NVARCHAR(50),
     idRol INT,
     idModelo INT,
+	idDestino INT,
 	idTripulacion INT,
     horasVuelo int,
-    PRIMARY KEY (idAerolinea, idTiempo, idRol, idModelo, idTripulacion),
+	vuelo int,
+    PRIMARY KEY (idAerolinea, idTiempo, idRol, idModelo, idTripulacion, idDestino),
     
     FOREIGN KEY (idAerolinea) REFERENCES dimAerolinea(idAerolinea),
     FOREIGN KEY (idTiempo) REFERENCES dimTiempo(idTiempo),
     FOREIGN KEY (idRol) REFERENCES dimRol(idRol),
     FOREIGN KEY (idModelo) REFERENCES dimModelo(idModelo),
-	FOREIGN KEY (idTripulacion) REFERENCES dimTripulacion(idCrew)
+	FOREIGN KEY (idTripulacion) REFERENCES dimTripulacion(idCrew), 
+	FOREIGN KEY (idDestino) REFERENCES dimDestino(idDestino)
 );
+
+
 
 EXEC sp_rename 'factCrew', 'factVuelo';
 
 Truncate table factCrew
 
 
-ALTER TABLE dimTiempo
+ALTER TABLE factVuelo
+add vuelo INT
+
 ALTER COLUMN idTiempo NVARCHAR(50) PRIMARY KEY
 
 EXEC sp_rename 'dimCrew', 'dimTripulacion';
 select * from factVuelo
 
 
+drop table factVuelo
+drop table dimTripulacion
+
 select * from dimAerolinea
 select * from dimTripulacion
+
+
+truncate table factVuelo

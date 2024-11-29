@@ -53,7 +53,7 @@ FROM
 WHERE 
     NOT EXISTS (
         SELECT 1 
-        FROM PrimerCubo.dbo.dimTiempo AS dest
+        FROM SegundoParcialFinal.dbo.dimTiempo AS dest
         WHERE dest.idTiempo = flight.id
     );
 
@@ -92,6 +92,110 @@ JOIN
     flight_crew_role fcr ON f.id = fcr.id_flight  
 JOIN
     role_flight rf ON fcr.id_role = rf.id;  
+
+
+
+
+
+
+
+
+-----------------EXAMEN
+SELECT 
+    f.id AS idFecha,  -- Agrupamos por id del vuelo
+    fn.id_airline AS idAerolinea, 
+    a.id_plane_model AS idAvion, 
+    fn.id_airport_goal AS idDestino, -- Nuevo campo: id del aeropuerto destino
+    DATEDIFF(HOUR, fn.departure_time, fn.arrival_time) AS horas_de_vuelo, -- Duración del vuelo
+    COUNT(DISTINCT fcr.id_flight_crew) AS cantidad_tripulantes -- Número de tripulantes únicos asignados al vuelo
+FROM 
+    flight f
+JOIN 
+    flight_number fn ON f.id_flight_number = fn.id
+JOIN 
+    airplane a ON f.id_airplane = a.id
+JOIN 
+    plane_model pm ON a.id_plane_model = pm.id
+JOIN 
+    flight_crew_role fcr ON f.id = fcr.id_flight  
+GROUP BY 
+    f.id, fn.id_airline, a.id_plane_model, fn.id_airport_goal, fn.departure_time, fn.arrival_time
+ORDER BY 
+    f.id; -- Opcional, para ordenar los vuelos por su ID
+
+
+-------------
+--------------------
+SELECT 
+    f.id AS idTiempo, 
+    fn.id_airline AS idAerolinea, 
+    a.id_plane_model AS idAvion,
+    fn.id_airport_goal AS idDestino, 
+    DATEDIFF(HOUR, fn.departure_time, fn.arrival_time) AS horas_de_vuelo, 
+    COUNT(DISTINCT fcr.id_flight_crew) AS cantidad_tripulantes 
+FROM 
+    flight f
+JOIN 
+    flight_number fn ON f.id_flight_number = fn.id
+JOIN 
+    airplane a ON f.id_airplane = a.id
+JOIN 
+    plane_model pm ON a.id_plane_model = pm.id
+JOIN 
+    flight_crew_role fcr ON f.id = fcr.id_flight
+WHERE 
+    NOT EXISTS ( 
+        SELECT 1 
+        FROM SegundoParcialFinal.dbo.factVuelo fv
+        WHERE fv.idTiempo = f.id 
+          AND fv.idAerolinea = fn.id_airline 
+          AND fv.idModelo = a.id_plane_model 
+          AND fv.idDestino = fn.id_airport_goal
+    )
+GROUP BY 
+    f.id, fn.id_airline, a.id_plane_model, fn.id_airport_goal, fn.departure_time, fn.arrival_time
+ORDER BY 
+    f.id; 
+
+
+
+-----------------------
+SELECT 
+    f.id AS idVuelo, 
+    fn.id_airline AS idAerolinea, 
+    a.id_plane_model AS idAvion, 
+    fn.id_airport_goal AS idDestino, 
+    rf.id AS idRol, 
+    DATEDIFF(HOUR, fn.departure_time, fn.arrival_time) AS horas_de_vuelo, 
+    COUNT(DISTINCT fcr.id_flight_crew) AS cantidad_tripulantes 
+FROM 
+    flight f
+JOIN 
+    flight_number fn ON f.id_flight_number = fn.id
+JOIN 
+    airplane a ON f.id_airplane = a.id
+JOIN 
+    plane_model pm ON a.id_plane_model = pm.id
+JOIN 
+    flight_crew_role fcr ON f.id = fcr.id_flight
+JOIN 
+    role_flight rf ON fcr.id_role = rf.id 
+WHERE 
+    NOT EXISTS ( 
+        SELECT 1 
+        FROM SegundoParcialFinal.dbo.factVuelo fv
+        WHERE fv.idTiempo = f.id 
+          AND fv.idAerolinea = fn.id_airline 
+          AND fv.idModelo = a.id_plane_model 
+          AND fv.idDestino = fn.id_airport_goal
+    )
+GROUP BY 
+    f.id, fn.id_airline, a.id_plane_model, fn.id_airport_goal, rf.id, fn.departure_time, fn.arrival_time
+ORDER BY 
+    f.id; 
+
+
+
 
 
 --- opcion dos
@@ -548,3 +652,240 @@ WHERE
           AND fc.idAerolinea = fn.id_airline 
           AND fc.idModelo = a.id_plane_model
     )
+
+
+
+
+
+
+
+---------------------------
+----------------------------
+SELECT 
+    CAST(f.id AS NVARCHAR) + '-1' AS idTiempo, -- Sufijo único '-1' para vuelos en un solo día
+    rf.id AS idRol, 
+    fn.id_airline AS idAerolinea, 
+    a.id_plane_model AS idAvion, 
+	fc.id AS idTripulacion, -- Añadido el id de la tripulación
+	fn.id AS Vuelo,
+    DATEDIFF(HOUR, fn.departure_time, fn.arrival_time) AS horas_de_vuelo
+FROM 
+    flight f
+JOIN 
+    flight_number fn ON f.id_flight_number = fn.id
+JOIN 
+    airplane a ON f.id_airplane = a.id
+JOIN 
+    plane_model pm ON a.id_plane_model = pm.id
+JOIN
+    flight_crew_role fcr ON f.id = fcr.id_flight  
+JOIN
+    role_flight rf ON fcr.id_role = rf.id
+JOIN
+    flight_crew fc ON fcr.id_flight_crew = fc.id 
+WHERE 
+    fn.arrival_date = f.flight_date -- El vuelo llega el mismo día
+/*	AND NOT EXISTS (
+        SELECT 1 
+        FROM SegundoParcial.dbo.factVuelo fc
+        WHERE fc.idTiempo = idTiempo 
+          AND fc.idRol = rf.id 
+          AND fc.idAerolinea = fn.id_airline 
+          AND fc.idModelo = a.id_plane_model
+    )*/
+
+UNION ALL
+
+-- Tuplas para vuelos que abarcan dos días (día de salida)
+SELECT 
+    CAST(f.id AS NVARCHAR) + '-1' AS idTiempo, -- Sufijo único '-2' para el día de salida
+    rf.id AS idRol, 
+    fn.id_airline AS idAerolinea, 
+    a.id_plane_model AS idAvion,
+	fc.id AS idTripulacion, 
+	fn.id AS Vuelo,
+    DATEDIFF(HOUR, fn.departure_time, '23:59:59') AS horas_de_vuelo
+FROM 
+    flight f
+JOIN 
+    flight_number fn ON f.id_flight_number = fn.id
+JOIN 
+    airplane a ON f.id_airplane = a.id
+JOIN 
+    plane_model pm ON a.id_plane_model = pm.id
+JOIN
+    flight_crew_role fcr ON f.id = fcr.id_flight  
+JOIN
+    role_flight rf ON fcr.id_role = rf.id
+JOIN
+    flight_crew fc ON fcr.id_flight_crew = fc.id 
+WHERE 
+    fn.arrival_date > f.flight_date -- El vuelo llega al día siguiente
+/*	AND NOT EXISTS (
+        SELECT 1 
+        FROM SegundoParcial.dbo.factVuelo fc
+        WHERE fc.idTiempo = idTiempo 
+          AND fc.idRol = rf.id 
+          AND fc.idAerolinea = fn.id_airline 
+          AND fc.idModelo = a.id_plane_model
+    )*/
+
+UNION ALL
+
+-- Tuplas para vuelos que abarcan dos días (día de llegada)
+SELECT 
+    CAST(f.id AS NVARCHAR) + '-2' AS idTiempo, -- Sufijo único '-3' para el día de llegada
+    rf.id AS idRol, 
+    fn.id_airline AS idAerolinea, 
+    a.id_plane_model AS idAvion, 
+	fc.id AS idTripulacion,
+	fn.id AS Vuelo,
+    DATEDIFF(HOUR, '00:00:00', fn.arrival_time) AS horas_de_vuelo
+FROM 
+    flight f
+JOIN 
+    flight_number fn ON f.id_flight_number = fn.id
+JOIN 
+    airplane a ON f.id_airplane = a.id
+JOIN 
+    plane_model pm ON a.id_plane_model = pm.id
+JOIN
+    flight_crew_role fcr ON f.id = fcr.id_flight  
+JOIN
+    role_flight rf ON fcr.id_role = rf.id
+JOIN
+    flight_crew fc ON fcr.id_flight_crew = fc.id 
+
+WHERE 
+    fn.arrival_date > f.flight_date -- El vuelo llega al día siguiente
+/*	AND NOT EXISTS (
+        SELECT 1 
+        FROM SegundoParcial.dbo.factVuelo fc
+        WHERE fc.idTiempo = idTiempo 
+          AND fc.idRol = rf.id 
+          AND fc.idAerolinea = fn.id_airline 
+          AND fc.idModelo = a.id_plane_model
+    )*/
+
+
+	-------
+
+
+-- Tuplas para vuelos que llegan el mismo día
+SELECT 
+    CAST(f.id AS NVARCHAR) + '-1' AS idTiempo, -- Sufijo único '-1' para vuelos en un solo día
+    rf.id AS idRol, 
+    fn.id_airline AS idAerolinea, 
+    a.id_plane_model AS idAvion, 
+    fc.id AS idTripulacion, -- ID de la tripulación
+    fn.id_airport_goal AS idDestino, -- Destino
+    fn.id AS Vuelo,
+    DATEDIFF(HOUR, fn.departure_time, fn.arrival_time) AS horas_de_vuelo
+FROM 
+    flight f
+JOIN 
+    flight_number fn ON f.id_flight_number = fn.id
+JOIN 
+    airplane a ON f.id_airplane = a.id
+JOIN 
+    plane_model pm ON a.id_plane_model = pm.id
+JOIN 
+    flight_crew_role fcr ON f.id = fcr.id_flight  
+JOIN 
+    role_flight rf ON fcr.id_role = rf.id
+JOIN 
+    flight_crew fc ON fcr.id_flight_crew = fc.id 
+WHERE 
+    fn.arrival_date = f.flight_date -- El vuelo llega el mismo día
+
+UNION ALL
+
+-- Tuplas para vuelos que abarcan dos días (día de salida)
+SELECT 
+    CAST(f.id AS NVARCHAR) + '-1' AS idTiempo, -- Sufijo único '-2' para el día de salida
+    rf.id AS idRol, 
+    fn.id_airline AS idAerolinea, 
+    a.id_plane_model AS idAvion,
+    fc.id AS idTripulacion, -- ID de la tripulación
+    fn.id_airport_goal AS idDestino, -- Destino
+    fn.id AS Vuelo,
+    DATEDIFF(HOUR, fn.departure_time, '23:59:59') AS horas_de_vuelo
+FROM 
+    flight f
+JOIN 
+    flight_number fn ON f.id_flight_number = fn.id
+JOIN 
+    airplane a ON f.id_airplane = a.id
+JOIN 
+    plane_model pm ON a.id_plane_model = pm.id
+JOIN 
+    flight_crew_role fcr ON f.id = fcr.id_flight  
+JOIN 
+    role_flight rf ON fcr.id_role = rf.id
+JOIN 
+    flight_crew fc ON fcr.id_flight_crew = fc.id 
+WHERE 
+    fn.arrival_date > f.flight_date -- El vuelo llega al día siguiente
+
+UNION ALL
+
+-- Tuplas para vuelos que abarcan dos días (día de llegada)
+SELECT 
+    CAST(f.id AS NVARCHAR) + '-2' AS idTiempo, -- Sufijo único '-3' para el día de llegada
+    rf.id AS idRol, 
+    fn.id_airline AS idAerolinea, 
+    a.id_plane_model AS idAvion, 
+    fc.id AS idTripulacion, -- ID de la tripulación
+    fn.id_airport_goal AS idDestino, -- Destino
+    fn.id AS Vuelo,
+    DATEDIFF(HOUR, '00:00:00', fn.arrival_time) AS horas_de_vuelo
+FROM 
+    flight f
+JOIN 
+    flight_number fn ON f.id_flight_number = fn.id
+JOIN 
+    airplane a ON f.id_airplane = a.id
+JOIN 
+    plane_model pm ON a.id_plane_model = pm.id
+JOIN 
+    flight_crew_role fcr ON f.id = fcr.id_flight  
+JOIN 
+    role_flight rf ON fcr.id_role = rf.id
+JOIN 
+    flight_crew fc ON fcr.id_flight_crew = fc.id 
+WHERE 
+    fn.arrival_date > f.flight_date -- El vuelo llega al día siguiente
+
+
+
+
+
+
+
+SELECT 
+    fn.id AS Vuelo, -- ID del vuelo
+    COUNT(DISTINCT fcr.id_flight_crew) AS cantidad_tripulantes, -- Número de tripulantes únicos asignados
+    SUM(DATEDIFF(HOUR, 
+        CASE WHEN fn.arrival_date = f.flight_date THEN fn.departure_time ELSE '00:00:00' END,
+        CASE WHEN fn.arrival_date = f.flight_date THEN fn.arrival_time ELSE '23:59:59' END
+    )) AS total_horas_vuelo -- Total de horas acumuladas del vuelo
+FROM 
+    flight f
+JOIN 
+    flight_number fn ON f.id_flight_number = fn.id
+JOIN 
+    airplane a ON f.id_airplane = a.id
+JOIN 
+    plane_model pm ON a.id_plane_model = pm.id
+JOIN
+    flight_crew_role fcr ON f.id = fcr.id_flight -- Relación con roles de tripulación
+JOIN
+    role_flight rf ON fcr.id_role = rf.id
+JOIN
+    flight_crew fc ON fcr.id_flight_crew = fc.id -- Relación con los tripulantes
+WHERE 
+    fn.arrival_date >= f.flight_date -- Consideramos vuelos del mismo día o días consecutivos
+GROUP BY 
+    fn.id -- Agrupamos por vuelo
+ORDER BY 
+    Vuelo; -- Opcional, para facilitar la lectura
